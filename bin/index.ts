@@ -114,7 +114,6 @@ async function upload({
   const deviceId = (await si.uuid()).os || "CLI";
   const osInfo = (await si.osInfo()).distro;
   const localAssets: any[] = [];
-  const newAssets: any[] = [];
 
   // Ping server
   log("[1] Pinging server...");
@@ -168,11 +167,8 @@ async function upload({
     deviceId
   );
 
-  localAssets.forEach((localAsset) => {
-    if (!backupAsset.includes(localAsset.id)) {
-      newAssets.push(localAsset);
-    }
-  });
+  const newAssets = localAssets.filter((localAsset) =>
+    !backupAsset.has(localAsset.id));
 
   if (newAssets.length == 0) {
     log(chalk.green("All assets have been backup to the server"));
@@ -336,7 +332,20 @@ async function startUpload(
     const fileStat = await stat(asset.filePath);
 
     let exifData = null;
-    if (assetType != "VIDEO") {
+
+    // Parse Google takeout json data
+    if (fs.existsSync(asset.filePath + ".json")) {
+      try {
+        const data = JSON.parse(fs.readFileSync(asset.filePath + ".json", "utf8"));
+        const created = data?.photoTakenTime?.formatted ?? null;
+
+        if (created !== null) {
+          exifData = { DateTimeOriginal: created };
+        }
+      } catch (e) {}
+    }
+
+    if (exifData === null && assetType != "VIDEO") {
       try {
         exifData = await exifr.parse(asset.filePath, {
           tiff: true,
@@ -455,7 +464,7 @@ async function getAssetInfoFromServer(
     const res = await axios.get(`${endpoint}/asset/${deviceId}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    return res.data;
+    return new Set(res.data);
   } catch (e) {
     log(chalk.red("Error getting device's uploaded assets"));
     process.exit(1);
