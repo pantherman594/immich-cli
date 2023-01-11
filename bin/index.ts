@@ -330,7 +330,7 @@ async function startUpload(
         const created = data?.photoTakenTime?.formatted ?? null;
 
         if (created !== null) {
-          exifData = { DateTimeOriginal: created };
+          exifData = { DateTimeOriginal: new Date(created).toISOString() };
         }
       } catch (e) {}
     }
